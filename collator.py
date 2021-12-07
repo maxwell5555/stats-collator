@@ -16,28 +16,35 @@ from collections import namedtuple
 OldSnapshot = namedtuple('Snapshot', 'power kills dead')
 NewSnapshot = namedtuple('NewSnapshot', 'power t4kills t5kills dead')
 
-def findGovernorIDMatchByName(row, stats):
+def findGovernorIDMatchByName(name, stats):
     for govID in stats:
-        if stats[govID]['name'] == row[2]:
-            print(f"Match found! {row[2]} has governorID {govID}")
+        if stats[govID]['name'] == name:
+            print(f"Match found! {name} has governorID {govID}")
             return govID
     return 0
 
 def readOriginalData(inFile, stats):
+    count = 0
     with open(inFile) as csvFile:
         reader = csv.reader(csvFile)
         next(reader, None) #skip header row
         
         for row in reader:
-            stats[row[0]] = {}
+            governorID = findGovernorIDMatchByName(row[0], stats)
+            
+            if governorID == 0:
+                print(f"Couldn't find match for {row[0]}")
+                count += 1
+                continue
             
             try:
-                stats[row[0]]['Before_First_War'] = OldSnapshot(int(row[1].replace(',', '')), int(row[3].replace(',', '')), int(row[2].replace(',', '')))
-                stats[row[0]]['First_War'] = OldSnapshot(int(row[5].replace(',', '')), int(row[7].replace(',', '')), int(row[6].replace(',', '')))
-                stats[row[0]]['First_War_Continued'] = OldSnapshot(int(row[11].replace(',', '')), int(row[13].replace(',', '')), int(row[12].replace(',', '')))
+                stats[governorID]['Before_First_War'] = OldSnapshot(int(row[1].replace(',', '')), int(row[3].replace(',', '')), int(row[2].replace(',', '')))
+                stats[governorID]['First_War'] = OldSnapshot(int(row[5].replace(',', '')), int(row[7].replace(',', '')), int(row[6].replace(',', '')))
+                stats[governorID]['First_War_Continued'] = OldSnapshot(int(row[11].replace(',', '')), int(row[13].replace(',', '')), int(row[12].replace(',', '')))
             except ValueError:
                 print(f'Error parsing {row[0]} stats') 
-            
+    
+    print(count)
     return stats
 
 def readBotData(inFile, stats, snapshotName):
@@ -49,7 +56,7 @@ def readBotData(inFile, stats, snapshotName):
             governorID = int(row[0])
             if governorID == 0:
                 print(f"Error parsing governor {row[2]}, governorID is 0. Searching for match...")
-                governorID = findGovernorIDMatchByName(row, stats)
+                governorID = findGovernorIDMatchByName(row[2], stats)
                 
                 #couldn't find match by name
                 if governorID == 0:
@@ -80,15 +87,54 @@ def readData(inFile):
 
 def writeData(stats, outFile):
     pass
+
+def exportCSV(stats, outFile):
+    with open(outFile, 'w', newline='', encoding="utf-8") as csvFile:
+        csvWriter = csv.writer(csvFile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+
+        for govID in stats:
+            #construct table row
+            row = []
+            row.append(stats[govID]['name'])
+            # try:
+                # row.extend(stats[govID]['Before_First_War'])
+            # except KeyError:
+                # row.extend(['missing', 'missing', 'missing'])
+            
+            # try:
+                # row.extend(stats[govID]['First_War'])
+            # except KeyError:
+                # row.extend(['missing', 'missing', 'missing'])
+
+            # try:
+                # row.extend(stats[govID]['First_War_Continued'])
+            # except KeyError:
+                # row.extend(['missing', 'missing', 'missing'])
+                
+            try:
+                row.extend(stats[govID]['Before_Second_War'])
+            except KeyError:
+                row.extend(['missing', 'missing', 'missing', 'missing'])
+                
+            try:
+                row.extend(stats[govID]['After_Second_War'])
+            except KeyError:
+                row.extend(['missing', 'missing', 'missing', 'missing'])
+                
+            csvWriter.writerow(row)
+        
     
 
 def main():
     stats = {}
     
     readBotData('sample-files/before_second_war.csv', stats, 'Before_Second_War')
-    #print(stats[19123275])
+    
     readBotData('sample-files/after_second_war.csv', stats, 'After_Second_War')
-    #print(stats[19123275])
+    
+    #readOriginalData('sample-files/icky_stats.csv', stats)
+    
+    exportCSV(stats, 'sample-files/output.csv')
 
 if __name__ == "__main__":
     main()
